@@ -390,9 +390,9 @@ GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value,
 		// Mali Fast — same Mali resolver but tighter GS tuning (1×, EECycleSkip etc.
 		// gated elsewhere) and distinct runtime so logs/UI show Mali Fast.
 		auto fast = GpuProfileDetail::ResolveMaliProfile(lowered_hints);
-		// Tighten for G71 8895: smaller pools, prefer_new off (constrained)
-		fast.gs_tuning.pooled_targets = std::min<u32>(fast.gs_tuning.pooled_targets, 48);
-		fast.gs_tuning.target_age = std::min<u32>(fast.gs_tuning.target_age, 4);
+		// Tighten for G71 8895: smaller pools, prefer_new off (constrained) (needs proper testing)
+		fast.tuning.pooled_targets = std::min<u32>(fast.tuning.pooled_targets, 48);
+		fast.tuning.target_age = std::min<u32>(fast.tuning.target_age, 4);
 		ApplyResolvedProfile(selection, RuntimeGpuProfile::MaliFast, std::move(fast));
 		return finalize();
 	}
