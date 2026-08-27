@@ -42,7 +42,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPRESS: true
       CCACHE_COMPRESSLEVEL: 9
-      CCACHE_MAXSIZE: 100M
+      CCACHE_MAXSIZE: 800M
       # Only way to use a secret in an if statement
       SIGN_KEY: ${{ secrets.APPLE_SIGN_P12_B64 }}
 
@@ -110,17 +110,13 @@ jobs:
           cd bin/resources
           aria2c -Z "${{ inputs.patchesUrl }}/patches.zip"
 
-      # -- SETUP CCACHE - https://cristianadam.eu/20200113/speeding-up-c-plus-plus-github-actions-using-ccache/
-      - name: Prepare ccache timestamp
-        id: ccache_cache_timestamp
-        run: echo "timestamp=$(date -u "+%Y-%m-%d-%H;%M;%S")" >> $GITHUB_OUTPUT
-
       - name: Cache ccache cache
         uses: actions/cache@v6
         with:
           path: .ccache
-          key: ${{ inputs.os }} arm64 ccache ${{ steps.ccache_cache_timestamp.outputs.timestamp }}
-          restore-keys: ${{ inputs.os }} arm64 ccache
+          key: ${{ inputs.os }}-arm64-ccache-${{ hashFiles('.github/workflows/scripts/macos/build-dependencies-universal.sh', 'cmake/BuildParameters.cmake') }}
+          restore-keys: |
+            ${{ inputs.os }}-arm64-ccache-
 
       - name: Generate CMake Files
         run: |
@@ -128,7 +124,7 @@ jobs:
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_OSX_ARCHITECTURES="arm64" \
                 -DDISABLE_ADVANCE_SIMD=ON \
-                -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+                -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
                 -DUSE_LINKED_FFMPEG=ON \
                 -DCMAKE_C_COMPILER_LAUNCHER=ccache \
                 -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \

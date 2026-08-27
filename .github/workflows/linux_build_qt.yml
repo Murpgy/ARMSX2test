@@ -55,7 +55,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPRESS: true
       CCACHE_COMPRESSLEVEL: 9
-      CCACHE_MAXSIZE: 100M
+      CCACHE_MAXSIZE: 800M
 
     steps:
       - name: Checkout Repository
@@ -86,17 +86,13 @@ jobs:
           PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: ./.github/workflows/scripts/common/name-artifacts.sh
 
-      # -- SETUP CCACHE - https://cristianadam.eu/20200113/speeding-up-c-plus-plus-github-actions-using-ccache/
-      - name: Prepare ccache timestamp
-        id: ccache_cache_timestamp
-        run: echo "timestamp=$(date -u "+%Y-%m-%d-%H;%M;%S")" >> $GITHUB_OUTPUT
-
       - name: ccache cache files
         uses: actions/cache@v6
         with:
           path: .ccache
-          key: ${{ inputs.os }} ${{ inputs.platform }} ${{ inputs.compiler }} ccache ${{ steps.ccache_cache_timestamp.outputs.timestamp }}
-          restore-keys: ${{ inputs.os }} ${{ inputs.platform }} ${{ inputs.compiler }} ccache
+          key: ${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-ccache-${{ hashFiles('.github/workflows/scripts/linux/build-dependencies-qt.sh', '.github/workflows/scripts/common/*.patch', 'cmake/BuildParameters.cmake') }}
+          restore-keys: |
+            ${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-ccache-
 
       - name: Install Packages
         run: |

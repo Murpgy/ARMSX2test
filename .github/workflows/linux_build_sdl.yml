@@ -40,7 +40,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPRESS: true
       CCACHE_COMPRESSLEVEL: 9
-      CCACHE_MAXSIZE: 100M
+      CCACHE_MAXSIZE: 800M
 
     steps:
       - name: Checkout Repository
@@ -63,16 +63,13 @@ jobs:
           PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: ./.github/workflows/scripts/common/name-artifacts.sh
 
-      - name: Prepare ccache timestamp
-        id: ccache_cache_timestamp
-        run: echo "timestamp=$(date -u "+%Y-%m-%d-%H;%M;%S")" >> $GITHUB_OUTPUT
-
       - name: ccache cache files
         uses: actions/cache@v6
         with:
           path: .ccache
-          key: ${{ inputs.os }} ${{ inputs.platform }} sdl ccache ${{ steps.ccache_cache_timestamp.outputs.timestamp }}
-          restore-keys: ${{ inputs.os }} ${{ inputs.platform }} sdl ccache
+          key: ${{ inputs.os }}-${{ inputs.platform }}-sdl-ccache-${{ hashFiles('.github/workflows/scripts/linux/build-dependencies-runner.sh', 'cmake/BuildParameters.cmake') }}
+          restore-keys: |
+            ${{ inputs.os }}-${{ inputs.platform }}-sdl-ccache-
 
       - name: Install Packages
         run: |
@@ -99,7 +96,7 @@ jobs:
       - name: Generate CMake
         run: |
           cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
             -DCMAKE_PREFIX_PATH="$HOME/deps" \
             -DCMAKE_C_COMPILER=clang-17 \
