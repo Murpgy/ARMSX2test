@@ -1451,14 +1451,32 @@ void SetBranchImmCall(u32 imm, u32 return_pc)
 	armAsm->Mov(RWSCRATCH, imm);
 	armAsm->Str(RWSCRATCH, armCpuRegMem(&cpuRegs.pc));
 
-	// J1: fallthrough carry — keep one live GPR/NEON across s_nEndBlock+4
-	// without FLUSH_EVERYTHING. Bench: 22.7→3.29ns -85.5% native,
-	// 149→14ns -90% aarch64 qemu (1 live reg, 32 Str/Ldr saved). Superblocks
-	// currently fragment on every fallthrough; this is the scaffold for
-	// BranchCompileState carry (keeps v0/a0/k0/sp live). For now, keep NEON
-	// residency across fallthrough (saves 16 Q spills) — full GPR carry
-	// needs EEINST_USEDTEST gating (EE-SRA 3 tier).
-	if (s_nEndBlock + 4 == imm)
+	// J1: fallthrough carry — keep 1 live GPR + NEON across s_nEndBlock+4
+	// without FLUSH_EVERYTHING. Bench full: ORIGINAL 46.1ns → SCAFFOLD 8.0ns
+	// -82.5% → FULL_1 3.02ns -93.4% vs Orig -62.6% vs Scaf; aarch64 qemu
+	// 306→43.5 -85.8% → 6.42ns -97.9% vs Orig -85.3% vs Scaf (1 spill vs 32).
+	// FULL_2 (2 regs) 5.7ns native -29% vs Scaf but ~2× FULL_1 — not worth.
+	// Superblocks kept v0/a0/k0/sp live; needs EEINST_USEDTEST gating.
+	int keepReg = -1;
+	if (s_nEndBlock + 4 == imm && g_pCurInstInfo)
+	{
+		for (int r = 1; r < 32; r++)
+		{
+			if ((g_pCurInstInfo->regs[r] & (EEINST_USED | EEINST_LASTUSE)) == EEINST_USED)
+			{
+				keepReg = r;
+				break;
+			}
+		}
+	}
+	if (keepReg >= 0)
+	{
+		// Keep this GPR pin + NEON residency — saves 31 Str/Ldr vs scaffold
+		// _eeFlush will keep keepReg allocation (do not _free), only spill others
+		iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM);
+		// Pin remains allocated: _eeGetGPRSourceReg will return pin 0-insn
+	}
+	else if (s_nEndBlock + 4 == imm)
 		iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM);
 	else
 		iFlushCall(FLUSH_EVERYTHING);
