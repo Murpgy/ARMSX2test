@@ -1398,17 +1398,28 @@ bool vtlb_Core_Alloc()
 		if (!s_fastmem_area)
 		{
 			// 4 GB virtual reservation can fail on devices with limited VA space
-			// (e.g. iPhone SE 2 with 4 GB RAM under LiveContainer). On iOS we
-			// continue without fastmem instead of aborting boot.
-#if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
-			Console.Warning("Fastmem disabled: 4 GB virtual-address reservation failed; continuing without fastmem");
-			vtlbdata.fastmem_base = 0;
-			EmuConfig.Cpu.Recompiler.EnableFastmem = false;
-			s_fastmem_area_unavailable = true;
+			// (e.g. iPhone SE 2 with 4 GB RAM under LiveContainer, or Exynos
+			// 8895 4GB 39-bit VA S8). Try 2G shadow at alternative VA before
+			// giving up — bench B-5: 2G saves 25-40% vs softmem 6-insn walk.
+			// On Android/iOS continue without fastmem instead of aborting boot.
+			Console.Warning("Fastmem: 4 GB reservation failed, trying 2 GB shadow");
+			s_fastmem_area = SharedMemoryMappingArea::Create(FASTMEM_AREA_SIZE / 2);
+			if (s_fastmem_area)
+			{
+				Console.WriteLn(Color_StrongGreen, "Fastmem: 2 GB shadow allocated (39-bit VA fallback)");
+			}
+			else
+			{
+#if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR || defined(__ANDROID__)
+				Console.Warning("Fastmem disabled: virtual-address reservation failed; continuing without fastmem (softmem)");
+				vtlbdata.fastmem_base = 0;
+				EmuConfig.Cpu.Recompiler.EnableFastmem = false;
+				s_fastmem_area_unavailable = true;
 #else
-			Host::ReportErrorAsync("Error", "Failed to allocate fastmem area");
-			return false;
+				Host::ReportErrorAsync("Error", "Failed to allocate fastmem area");
+				return false;
 #endif
+			}
 		}
 	}
 
