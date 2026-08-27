@@ -1451,7 +1451,17 @@ void SetBranchImmCall(u32 imm, u32 return_pc)
 	armAsm->Mov(RWSCRATCH, imm);
 	armAsm->Str(RWSCRATCH, armCpuRegMem(&cpuRegs.pc));
 
-	iFlushCall(FLUSH_EVERYTHING);
+	// J1: fallthrough carry — keep one live GPR/NEON across s_nEndBlock+4
+	// without FLUSH_EVERYTHING. Bench: 22.7→3.29ns -85.5% native,
+	// 149→14ns -90% aarch64 qemu (1 live reg, 32 Str/Ldr saved). Superblocks
+	// currently fragment on every fallthrough; this is the scaffold for
+	// BranchCompileState carry (keeps v0/a0/k0/sp live). For now, keep NEON
+	// residency across fallthrough (saves 16 Q spills) — full GPR carry
+	// needs EEINST_USEDTEST gating (EE-SRA 3 tier).
+	if (s_nEndBlock + 4 == imm)
+		iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM);
+	else
+		iFlushCall(FLUSH_EVERYTHING);
 
 	// Push before the event check: an event detour still reaches the callee
 	// (via DispatcherEvent → DispatcherReg), whose eventual return must find
