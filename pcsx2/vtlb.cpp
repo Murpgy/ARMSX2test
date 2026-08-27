@@ -85,6 +85,7 @@ static constexpr u32 FASTMEM_PAGE_COUNT = FASTMEM_AREA_SIZE / VTLB_PAGE_SIZE;
 static constexpr u32 NO_FASTMEM_MAPPING = 0xFFFFFFFFu;
 
 static std::unique_ptr<SharedMemoryMappingArea> s_fastmem_area;
+static size_t s_fastmem_size = FASTMEM_AREA_SIZE; // FULL: variable size for 2G shadow (B-5)
 static std::vector<u32> s_fastmem_virtual_mapping; // maps vaddr -> mainmem offset
 static std::unordered_multimap<u32, u32> s_fastmem_physical_mapping; // maps mainmem offset -> vaddr
 static std::unordered_map<uptr, LoadstoreBackpatchInfo> s_fastmem_backpatch_info;
@@ -1394,7 +1395,8 @@ bool vtlb_Core_Alloc()
 	}
 	else
 	{
-		s_fastmem_area = SharedMemoryMappingArea::Create(FASTMEM_AREA_SIZE);
+		s_fastmem_size = FASTMEM_AREA_SIZE;
+		s_fastmem_area = SharedMemoryMappingArea::Create(s_fastmem_size);
 		if (!s_fastmem_area)
 		{
 			// 4 GB virtual reservation can fail on devices with limited VA space
@@ -1403,13 +1405,15 @@ bool vtlb_Core_Alloc()
 			// giving up — bench B-5: 2G saves 25-40% vs softmem 6-insn walk.
 			// On Android/iOS continue without fastmem instead of aborting boot.
 			Console.Warning("Fastmem: 4 GB reservation failed, trying 2 GB shadow");
-			s_fastmem_area = SharedMemoryMappingArea::Create(FASTMEM_AREA_SIZE / 2);
+			s_fastmem_size = FASTMEM_AREA_SIZE / 2;
+			s_fastmem_area = SharedMemoryMappingArea::Create(s_fastmem_size);
 			if (s_fastmem_area)
 			{
-				Console.WriteLn(Color_StrongGreen, "Fastmem: 2 GB shadow allocated (39-bit VA fallback)");
+				Console.WriteLn(Color_StrongGreen, "Fastmem: 2 GB shadow allocated (39-bit VA fallback, size %zu MB)", s_fastmem_size >> 20);
 			}
 			else
 			{
+				s_fastmem_size = 0;
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR || defined(__ANDROID__)
 				Console.Warning("Fastmem disabled: virtual-address reservation failed; continuing without fastmem (softmem)");
 				vtlbdata.fastmem_base = 0;
@@ -1441,10 +1445,10 @@ bool vtlb_Core_Alloc()
 
 	if (s_fastmem_area)
 	{
-		s_fastmem_virtual_mapping.resize(FASTMEM_PAGE_COUNT, NO_FASTMEM_MAPPING);
+		s_fastmem_virtual_mapping.resize(s_fastmem_size / VTLB_PAGE_SIZE, NO_FASTMEM_MAPPING);
 		vtlbdata.fastmem_base = (uptr)s_fastmem_area->BasePointer();
-		DevCon.WriteLn(Color_StrongGreen, "Fastmem area: %p - %p",
-			vtlbdata.fastmem_base, vtlbdata.fastmem_base + (FASTMEM_AREA_SIZE - 1));
+		DevCon.WriteLn(Color_StrongGreen, "Fastmem area: %p - %p (%zu MB, runtime page %u)",
+			vtlbdata.fastmem_base, vtlbdata.fastmem_base + (s_fastmem_size - 1), s_fastmem_size >> 20, __pagesize);
 	}
 
 	Error error;
