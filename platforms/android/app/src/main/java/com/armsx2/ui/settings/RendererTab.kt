@@ -653,8 +653,8 @@ fun RendererTab(state: MutableState<Settings>) {
             // RestartButton does.
             SegmentedRow(
                 label = str("renderer.gpuProfile.label"),
-                options = listOf("Auto", "Mali", "Adreno", "PowerVR", "Xclipse"),
-                selectedIndex = s.gpuProfile.coerceIn(0, 4),
+                options = listOf("Auto", "Mali", "Adreno", "PowerVR", "Xclipse", "Mali Fast"),
+                selectedIndex = s.gpuProfile.coerceIn(0, 5),
                 description = str("renderer.gpuProfile.description"),
                 onChange = {
                     apply(s.copy(gpuProfile = it))

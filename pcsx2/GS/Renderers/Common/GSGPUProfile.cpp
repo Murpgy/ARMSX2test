@@ -156,6 +156,8 @@ GpuProfileOverride GpuProfileDetector::ParseOverride(std::string_view value)
 	const std::string lowered = GpuProfileDetail::ToLowerASCII(value);
 	if (lowered == "mali")
 		return GpuProfileOverride::Mali;
+	if (lowered == "mali_fast" || lowered == "mali-fast" || lowered == "malifast")
+		return GpuProfileOverride::MaliFast;
 	if (lowered == "adreno")
 		return GpuProfileOverride::Adreno;
 	if (lowered == "powervr")
@@ -172,6 +174,8 @@ const char* GpuProfileDetector::OverrideToConfigString(GpuProfileOverride value)
 	{
 		case GpuProfileOverride::Mali:
 			return "mali";
+		case GpuProfileOverride::MaliFast:
+			return "mali_fast";
 		case GpuProfileOverride::Adreno:
 			return "adreno";
 		case GpuProfileOverride::PowerVR:
@@ -190,6 +194,8 @@ const char* GpuProfileDetector::OverrideToString(GpuProfileOverride value)
 	{
 		case GpuProfileOverride::Mali:
 			return "Force Mali";
+		case GpuProfileOverride::MaliFast:
+			return "Force Mali Fast";
 		case GpuProfileOverride::Adreno:
 			return "Force Adreno";
 		case GpuProfileOverride::PowerVR:
@@ -208,6 +214,8 @@ const char* GpuProfileDetector::RuntimeProfileToString(RuntimeGpuProfile value)
 	{
 		case RuntimeGpuProfile::Mali:
 			return "Mali";
+		case RuntimeGpuProfile::MaliFast:
+			return "Mali Fast";
 		case RuntimeGpuProfile::PowerVR:
 			return "PowerVR";
 		case RuntimeGpuProfile::Adreno:
@@ -374,6 +382,18 @@ GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value,
 	if (selection.override_mode == GpuProfileOverride::Mali)
 	{
 		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
+		return finalize();
+	}
+
+	if (selection.override_mode == GpuProfileOverride::MaliFast)
+	{
+		// Mali Fast — same Mali resolver but tighter GS tuning (1×, EECycleSkip etc.
+		// gated elsewhere) and distinct runtime so logs/UI show Mali Fast.
+		auto fast = GpuProfileDetail::ResolveMaliProfile(lowered_hints);
+		// Tighten for G71 8895: smaller pools, prefer_new off (constrained)
+		fast.gs_tuning.pooled_targets = std::min<u32>(fast.gs_tuning.pooled_targets, 48);
+		fast.gs_tuning.target_age = std::min<u32>(fast.gs_tuning.target_age, 4);
+		ApplyResolvedProfile(selection, RuntimeGpuProfile::MaliFast, std::move(fast));
 		return finalize();
 	}
 

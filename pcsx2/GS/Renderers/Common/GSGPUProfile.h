@@ -15,6 +15,7 @@ enum class GpuProfileOverride : u8
 	Adreno,
 	PowerVR,
 	Xclipse,
+	MaliFast,
 };
 
 enum class RuntimeGpuProfile : u8
@@ -24,6 +25,7 @@ enum class RuntimeGpuProfile : u8
 	Adreno,
 	PowerVR,
 	Xclipse,
+	MaliFast,
 	/// Apple Silicon (M-series / A-series). A TBDR like the mobile parts, but it is NOT one of
 	/// them and must never inherit their workarounds — before this existed, desktop GL resolved
 	/// anything not-Mali to Adreno, so an M2 ran Adreno-only paths (reported by bmd: "GL: Adreno -

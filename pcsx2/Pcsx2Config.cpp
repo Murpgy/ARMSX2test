@@ -1242,6 +1242,9 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapEntry(AndroidGpuProfileOverride);
 	if (StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "mali") == 0)
 		AndroidGpuProfileOverride = "mali";
+	else if (StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "mali_fast") == 0 ||
+	         StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "mali-fast") == 0)
+		AndroidGpuProfileOverride = "mali_fast";
 	else if (StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "adreno") == 0)
 		AndroidGpuProfileOverride = "adreno";
 	else

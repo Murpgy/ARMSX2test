@@ -758,8 +758,8 @@ data class Settings(
     val triFilter: Int = -1,
     /** EmuCore/GS/MaxAnisotropy — 0 Off, else 2/4/8/16. */
     val maxAnisotropy: Int = 0,
-    /** EmuCore/GS/AndroidGpuProfileOverride — 0 Auto · 1 Mali · 2 Adreno · 3 PowerVR · 4 Xclipse.
-     *  Stringified to "auto"/"mali"/"adreno"/"powervr"/"xclipse" when written to emucore.
+    /** EmuCore/GS/AndroidGpuProfileOverride — 0 Auto · 1 Mali · 2 Adreno · 3 PowerVR · 4 Xclipse · 5 Mali Fast.
+     *  Stringified to "auto"/"mali"/"adreno"/"powervr"/"xclipse"/"mali_fast" when written to emucore.
      *  Picked up in GSDeviceOGL::CheckFeatures at device init; requires
      *  a renderer restart to take effect. */
     val gpuProfile: Int = 0,
@@ -1334,6 +1334,7 @@ data class Settings(
                 "adreno" -> 2
                 "powervr" -> 3
                 "xclipse" -> 4
+                "mali_fast" -> 5
                 "auto" -> 0
                 else -> this.gpuProfile
             },
@@ -1573,6 +1574,7 @@ data class Settings(
             2 -> "adreno"
             3 -> "powervr"
             4 -> "xclipse"
+            5 -> "mali_fast"
             else -> "auto"
         }
         put("EmuCore/GS", "AndroidGpuProfileOverride", "string", gpuProfileStr)
