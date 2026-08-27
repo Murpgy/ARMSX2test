@@ -130,11 +130,14 @@ jobs:
           # separate because BuildParameters.cmake's escape hatch tests
           # CMAKE_CXX_FLAGS for "-march=" only; -moutline-atomics must be a
           # distinct token.
+          # libName unified to emucore_4k for both — Java loader hard-codes
+          # emucore_4k/emucore_16k (NativeApp.java:50), so emucore_4k_v8 would
+          # UnsatisfiedLinkError on v8.0 and break folder import (getBiosInfoFromFd).
           - variant: "arm64-v8.0-4k"
             march: "armv8-a"
             marchExtra: "-moutline-atomics"
             hostPageSize: "0x1000"
-            libName: "emucore_4k_v8"
+            libName: "emucore_4k"
             artifactSuffix: "android-arm64-v8.0-4k"
             pageNote: "4K baseline"
           # Modern default: lets BuildParameters.cmake choose armv8.1-a (LSE).
