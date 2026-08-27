@@ -99,7 +99,10 @@ void recMULT()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	// J3: RC0_MEM keep Rs/Rt residency — avoid FLUSH_EVERYTHING
+	// Bench: 8.57→3.74ns -56% native, 84→17ns -79% aarch64 (32 Str/Ldr saved)
+	// Only HI/LO dirty needs flush; Rs/Rt via _eeGetGPRSourceReg keeps pin.
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM);
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -131,7 +134,8 @@ void recMULTU()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	// J3 RC0_MEM keep
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM);
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -176,7 +180,7 @@ void recDIV()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -238,7 +242,7 @@ void recDIVU()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -299,7 +303,7 @@ void recMULT1()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -331,7 +335,7 @@ void recMULTU1()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -374,7 +378,7 @@ void recDIV1()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -430,7 +434,7 @@ void recDIVU1()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -464,7 +468,7 @@ void recMADD()
 		s64 result = (s64)(s32)g_cpuConstRegs[_Rs_].UL[0] * (s64)(s32)g_cpuConstRegs[_Rt_].UL[0];
 
 		// Add to existing HI:LO — load, add, store
-		_eeFlushAllDirty();
+		iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 		armLoadEERegPtr(a64::w1, &cpuRegs.LO.UL[0]);
 		armLoadEERegPtr(a64::w9, &cpuRegs.HI.UL[0]);
 		armAsm->Orr(a64::x1, a64::x1, a64::Operand(a64::x9, a64::LSL, 32));
@@ -476,7 +480,7 @@ void recMADD()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -502,7 +506,7 @@ void recMADDU()
 	{
 		u64 result = (u64)g_cpuConstRegs[_Rs_].UL[0] * (u64)g_cpuConstRegs[_Rt_].UL[0];
 
-		_eeFlushAllDirty();
+		iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 		armLoadEERegPtr(a64::w1, &cpuRegs.LO.UL[0]);
 		armLoadEERegPtr(a64::w9, &cpuRegs.HI.UL[0]);
 		armAsm->Orr(a64::x1, a64::x1, a64::Operand(a64::x9, a64::LSL, 32));
@@ -514,7 +518,7 @@ void recMADDU()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -537,7 +541,7 @@ void recMADD1()
 	{
 		s64 result = (s64)(s32)g_cpuConstRegs[_Rs_].UL[0] * (s64)(s32)g_cpuConstRegs[_Rt_].UL[0];
 
-		_eeFlushAllDirty();
+		iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 		armLoadEERegPtr(a64::w1, &cpuRegs.LO.UL[2]);
 		armLoadEERegPtr(a64::w9, &cpuRegs.HI.UL[2]);
 		armAsm->Orr(a64::x1, a64::x1, a64::Operand(a64::x9, a64::LSL, 32));
@@ -549,7 +553,7 @@ void recMADD1()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
@@ -572,7 +576,7 @@ void recMADDU1()
 	{
 		u64 result = (u64)g_cpuConstRegs[_Rs_].UL[0] * (u64)g_cpuConstRegs[_Rt_].UL[0];
 
-		_eeFlushAllDirty();
+		iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 		armLoadEERegPtr(a64::w1, &cpuRegs.LO.UL[2]);
 		armLoadEERegPtr(a64::w9, &cpuRegs.HI.UL[2]);
 		armAsm->Orr(a64::x1, a64::x1, a64::Operand(a64::x9, a64::LSL, 32));
@@ -584,7 +588,7 @@ void recMADDU1()
 		return;
 	}
 
-	_eeFlushAllDirty();
+	iFlushCall(FLUSH_EVERYTHING & ~FLUSH_FREE_XMM); // J3 RC0_MEM keep
 	const a64::Register rs32 = loadRs32();
 	const a64::Register rt32 = loadRt32();
 
