@@ -2274,6 +2274,15 @@ std::string GSDeviceOGL::GetVSSource(VSSelector sel)
 
 std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 {
+	// G71 r16p0 (Exynos 8895) ARM fetch silently degrades the in-tile read to stale
+	// memory inside a live feedback loop (G-Force grey blur). Keep fetch for the
+	// 95% non-feedback draws (perf), force the sampler/copy path only for the
+	// feedback permutation. This is a per-shader variant, not a global disable
+	// (needs proper testing — only G71 r16p0 format confirmed).
+	const bool g71_feedback_shader = m_features.framebuffer_fetch && IsMaliG71r16p0() && sel.tex_is_fb;
+	const bool saved_fetch = m_features.framebuffer_fetch;
+	if (g71_feedback_shader)
+		m_features.framebuffer_fetch = false;
 	DevCon.WriteLn("GL: Compiling new pixel shader with selector 0x%016" PRIX64 "_%016" PRIX64, sel.key_hi, sel.key_lo);
 
 	std::string macro = fmt::format("#define PS_FST {}\n", sel.fst)
@@ -2342,6 +2351,8 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 	;
 
 	std::string src = GenGlslHeader("ps_main", GL_FRAGMENT_SHADER, macro);
+	if (g71_feedback_shader)
+		m_features.framebuffer_fetch = saved_fetch;
 	src += m_shader_tfx_fs;
 	return src;
 }
@@ -3829,7 +3840,14 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		PSSetShaderResource(TEXTURE_TEXTURE, config.tex);
 	if (config.pal)
 		PSSetShaderResource(TEXTURE_PALETTE, config.pal);
-	if (m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier))
+	// G71 r16p0 general per-draw guard: keep fetch for non-feedback draws, force
+	// copy path only for live feedback loops where ARM fetch degrades to stale
+	// memory (G-Force grey). Gated by m_features.framebuffer_fetch && IsMaliG71r16p0()
+	// so untouched hardware keeps existing behaviour (needs proper testing).
+	const bool g71_feedback_for_fetch = m_features.framebuffer_fetch && IsMaliG71r16p0() && config.rt &&
+	                                    (config.require_one_barrier || config.require_full_barrier) &&
+	                                    (config.ps.tex_is_fb || config.alpha_second_pass.ps.tex_is_fb);
+	if (m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier) && !g71_feedback_for_fetch)
 		PSSetShaderResource(TEXTURE_RT, colclip_rt ? colclip_rt : config.rt);
 	if (m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier) && config.ps.IsFeedbackLoopDepth())
 		// With ARM depth-stencil fetch the shader reads gl_LastFragDepthARM, not a
@@ -3958,8 +3976,13 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 
 	const bool rt_feedbackloop_pass1 = config.IsFeedbackLoopRT(config.ps);
 	const bool rt_feedbackloop_pass2 = config.IsFeedbackLoopRT(config.alpha_second_pass.ps);
-	if (draw_rt && !m_features.texture_barrier && (((config.require_one_barrier || (config.require_full_barrier && m_features.multidraw_fb_copy)) &&
-		(rt_feedbackloop_pass1 || rt_feedbackloop_pass2))))
+	// General per-draw guard gated by m_features.framebuffer_fetch && IsMaliG71r16p0() — keep
+	// fetch for non-feedback draws, force copy only for feedback loops on this blob.
+	const bool g71_feedback_needs_copy = m_features.framebuffer_fetch && IsMaliG71r16p0() &&
+	                                     (rt_feedbackloop_pass1 || rt_feedbackloop_pass2) &&
+	                                     (config.require_one_barrier || config.require_full_barrier);
+	if (draw_rt && ((!m_features.texture_barrier && ((config.require_one_barrier || (config.require_full_barrier && m_features.multidraw_fb_copy)) &&
+		(rt_feedbackloop_pass1 || rt_feedbackloop_pass2))) || g71_feedback_needs_copy))
 	{
 		// Requires a copy of the RT.
 		draw_rt_clone = CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true);
@@ -4130,14 +4153,21 @@ void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config,
 		else
 			pxAssert(config.drawlist_bbox && static_cast<u32>(config.drawlist_bbox->size()) == draw_list_size);
 
+		// G71 r16p0 general guard: when fetch is on but this feedback draw was forced
+		// to a copy (draw_rt_clone allocated), treat barrier as copy even though
+		// m_features.texture_barrier is true — shader was compiled with fetch off.
+		const bool g71_copy_active = (draw_rt_clone != nullptr || draw_ds_clone != nullptr) &&
+		                             m_features.framebuffer_fetch && IsMaliG71r16p0();
 		if (!m_features.texture_barrier && config.tex_hazard != config.TEX_HAZARD_NONE)
+			FeedbackCopyAndBind(config, draw_rt, draw_rt_clone, draw_ds, draw_ds_clone, config.samplearea);
+		else if (g71_copy_active && config.tex_hazard != config.TEX_HAZARD_NONE)
 			FeedbackCopyAndBind(config, draw_rt, draw_rt_clone, draw_ds, draw_ds_clone, config.samplearea);
 
 		for (u32 n = 0, p = 0; n < draw_list_size; n++)
 		{
 			const u32 count = config.drawlist->at(n) * indices_per_prim;
 
-			if (m_features.texture_barrier)
+			if (m_features.texture_barrier && !g71_copy_active)
 			{
 				glTextureBarrier();
 			}
@@ -4156,7 +4186,9 @@ void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config,
 
 	if (one_barrier)
 	{
-		if (m_features.texture_barrier)
+		const bool g71_one_copy = (draw_rt_clone != nullptr || draw_ds_clone != nullptr) &&
+		                          m_features.framebuffer_fetch && IsMaliG71r16p0();
+		if (m_features.texture_barrier && !g71_one_copy)
 		{
 			g_perfmon.Put(GSPerfMon::Barriers, 1);
 			glTextureBarrier();

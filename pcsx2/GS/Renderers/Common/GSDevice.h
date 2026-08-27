@@ -1742,6 +1742,14 @@ public:
 	__fi bool IsMaliGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Mali); }
 	__fi bool IsAdrenoGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Adreno); }
 	__fi bool IsPowerVRGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::PowerVR); }
+	// G71 r16p0 (Exynos 8895 / S8) silently degrades the ARM in-tile read to a stale memory
+	// fetch inside a live feedback loop (Needs proper testing — only this blob/format confirmed).
+	__fi bool IsMaliG71r16p0() const
+	{
+		return IsMaliGPUProfile() && GetMobileGPUIdentity().model_number == 71 &&
+		       GetMobileDriverProfile().version.known &&
+		       GetMobileDriverProfile().version.major == 16 && GetMobileDriverProfile().version.minor == 0;
+	}
 
 	__fi const WindowInfo& GetWindowInfo() const { return m_window_info; }
 	__fi s32 GetWindowWidth() const { return static_cast<s32>(m_window_info.surface_width); }
