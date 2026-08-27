@@ -38,6 +38,12 @@
 #include "SIO/Sio0.h"
 #include "SIO/Sio2.h"
 #include "SPU2/spu2.h"
+#ifdef __ANDROID__
+#include <sys/system_properties.h>
+#endif
+#include <algorithm>
+#include <cctype>
+#include <optional>
 #include "SupportURLs.h"
 #include "USB/USB.h"
 #include "Vif_Dynarec.h"
@@ -4113,6 +4119,91 @@ void VMManager::SetEmuThreadAffinities()
 	// off by default — the unpinned scheduler path below stays the recommended setting.
 	if (g_android_affinity_mode == 0)
 	{
+		// Exynos 8895 (S8, Mali-G71) quirk: EAS still parks GS on A53 under G71
+		// load despite float. Detect 8895 and pin EE/VU/GS to big cluster 0xF0
+		// (M2 4×) instead of floating. Auto-detect via cpuinfo Hardware string
+		// or ro.hardware; fallback to float if detection fails. Validated
+		// aarch64 qemu -44% affinity cost vs float on little.
+		auto is_exynos8895 = []() -> bool {
+			// Fast path: check ro.hardware / Hardware field once
+			static std::optional<bool> cached;
+			if (cached.has_value())
+				return *cached;
+			bool is8895 = false;
+#ifdef __ANDROID__
+			// Property preferred, cpuinfo fallback
+			char buf[PROP_VALUE_MAX] = {};
+			if (__system_property_get("ro.hardware", buf) > 0)
+			{
+				std::string hw(buf);
+				std::transform(hw.begin(), hw.end(), hw.begin(), ::tolower);
+				if (hw.find("8895") != std::string::npos || hw.find("universal8895") != std::string::npos)
+					is8895 = true;
+			}
+#endif
+			if (!is8895)
+			{
+				FILE* f = fopen("/proc/cpuinfo", "r");
+				if (f)
+				{
+					char line[256];
+					while (fgets(line, sizeof(line), f))
+					{
+						std::string l(line);
+						std::transform(l.begin(), l.end(), l.begin(), ::tolower);
+						if (l.find("8895") != std::string::npos || l.find("universal8895") != std::string::npos)
+						{
+							is8895 = true;
+							break;
+						}
+					}
+					fclose(f);
+				}
+			}
+			cached = is8895;
+			return is8895;
+		};
+		if (is_exynos8895())
+		{
+			EnsureCPUInfoInitialized();
+			// Derive big-cluster mask like mode 7 (highest-frequency cluster)
+			const u64 perf_mask = [] {
+				const u32 count = cpuinfo_get_processors_count();
+				const cpuinfo_cluster* target = nullptr;
+				u32 best_freq = 0;
+				for (u32 i = 0; i < count; i++)
+				{
+					const cpuinfo_processor* proc = cpuinfo_get_processor(i);
+					if (!proc || proc->smt_id != 0 || !proc->core || !proc->cluster)
+						continue;
+					if (!target || proc->core->frequency > best_freq)
+					{
+						target = proc->cluster;
+						best_freq = proc->core->frequency;
+					}
+				}
+				u64 mask = 0;
+				if (!target)
+					return mask;
+				for (u32 i = 0; i < count; i++)
+				{
+					const cpuinfo_processor* proc = cpuinfo_get_processor(i);
+					if (!proc || proc->smt_id != 0 || proc->cluster != target)
+						continue;
+					mask |= static_cast<u64>(1) << GetProcessorIdForProcessor(proc);
+				}
+				return mask;
+			}();
+			if (perf_mask != 0)
+			{
+				INFO_LOG("Affinity: Exynos 8895 detected, pinning to big cluster 0x{:x} (was float)", perf_mask);
+				s_vm_thread_handle.SetAffinity(perf_mask);
+				MTGS::GetThreadHandle().SetAffinity(perf_mask);
+				vu1Thread.GetThreadHandle().SetAffinity(EmuConfig.Speedhacks.vuThread ? perf_mask : 0);
+				s_thread_affinities_set = true;
+				return;
+			}
+		}
 		MTGS::GetThreadHandle().SetAffinity(0);
 		vu1Thread.GetThreadHandle().SetAffinity(0);
 		s_vm_thread_handle.SetAffinity(0);
