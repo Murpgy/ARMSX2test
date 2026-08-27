@@ -20,12 +20,29 @@
 #include "common/Console.h"
 #include "common/Error.h"
 
+#ifdef PCSX2_CORE
+#include "Config.h"
+#endif
+
 #include "glad/gl.h"
 
 static bool ShouldPreferESContext()
 {
-	const char* value = std::getenv("PREFER_GLES_CONTEXT");
-	return (value && std::strcmp(value, "1") == 0);
+	// Manual GLES 3.2 toggle under OpenGL (config OGLPreferGLES) + env fallback for testing.
+	// Lets S8 Vulkan 1.0 fallback to GLES 3.2 without ANGLe. On Android GLES is 1.0-safe (Mali-G71).
+	// Env keeps CI/dev bisect ability without touching ini.
+	if (const char* env = std::getenv("PREFER_GLES_CONTEXT"); env && std::strcmp(env, "1") == 0)
+		return true;
+#ifdef PCSX2_CORE
+	// EmuConfig is available after GS init; check the manual OpenGL GLES override.
+	// Include is guarded to keep GLContext usable in non-core tools (gsrunner).
+	extern const Pcsx2Config EmuConfig;
+	// Only force ES when user explicitly asked via OGLPreferGLES (under OpenGL renderer).
+	// Auto renderer still uses Core→ES fallback; this only reorders to ES-first.
+	if (EmuConfig.GS.OGLPreferGLES)
+		return true;
+#endif
+	return false;
 }
 
 GLContext::GLContext(const WindowInfo& wi)

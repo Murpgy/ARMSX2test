@@ -873,6 +873,7 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(OsdPerformancePos) &&
 
 		OpEqu(Renderer) &&
+		OpEqu(OGLPreferGLES) &&
 		OpEqu(UpscaleMultiplier) &&
 
 		OpEqu(AccurateBlendingUnit) &&
@@ -971,6 +972,7 @@ bool Pcsx2Config::GSOptions::IsRestartOption(const char* ini_key)
 	// as "GSBackThreadMode".
 	static constexpr const char* keys[] = {
 		"Renderer",
+		"OGLPreferGLES",
 		"Adapter",
 		"UseDebugDevice",
 		"DebugLabels",
@@ -999,6 +1001,7 @@ bool Pcsx2Config::GSOptions::IsRestartOption(const char* ini_key)
 bool Pcsx2Config::GSOptions::RestartOptionsAreEqual(const GSOptions& right) const
 {
 	return OpEqu(Renderer) &&
+		   OpEqu(OGLPreferGLES) &&
 		   OpEqu(Adapter) &&
 		   OpEqu(UseDebugDevice) &&
 		   // Selects the VK_EXT_debug_utils instance extension, which is fixed at
@@ -1153,6 +1156,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapIntEnumEx(OsdPerformancePos, "OsdPerformancePos");
 
 	SettingsWrapIntEnumEx(Renderer, "Renderer");
+	SettingsWrapEntry(OGLPreferGLES);
 	SettingsWrapEntryEx(UpscaleMultiplier, "upscale_multiplier");
 
 	SettingsWrapBitBoolEx(HWMipmap, "hw_mipmap");

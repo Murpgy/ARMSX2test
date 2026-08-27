@@ -1016,6 +1016,11 @@ struct Pcsx2Config
 		OsdOverlayPos OsdPerformancePos = DEFAULT_OSD_PERFORMANCE_POS;
 
 		GSRendererType Renderer = DEFAULT_HW_RENDERER;
+		// Manual GLES 3.2 override under OpenGL (Android S8 Vulkan 1.0 fallback).
+		// When true, OGL renderer forces an ES 3.2 context via EGL (GLES) instead of
+		// desktop GL Core 4.x. Lets S8 (Mali-G71 Vulkan 1.0) fall back to GLES without
+		// relying on env PREFER_GLES_CONTEXT. Auto keeps current Core→ES fallback.
+		bool OGLPreferGLES = false;
 		float UpscaleMultiplier = DEFAULT_UPSCALE_MULTIPLIER;
 
 		AccBlendLevel AccurateBlendingUnit = DEFAULT_BLENDING_ACCURACY;
