@@ -340,7 +340,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 if (USE_PGO_GENERATE OR USE_PGO_OPTIMIZE)
-	add_compile_options("-fprofile-dir=${CMAKE_SOURCE_DIR}/profile")
+	# Use binary-dir so profiles don't pollute the source tree, don't collide
+	# between build/ and build-handheld/, and don't get committed. The Android
+	# Gradle property armsx2.pgoProfile can still override via ARMSX2_PGO_PROFILE.
+	add_compile_options("-fprofile-dir=${CMAKE_BINARY_DIR}/profile")
 endif()
 
 if (USE_PGO_GENERATE)
