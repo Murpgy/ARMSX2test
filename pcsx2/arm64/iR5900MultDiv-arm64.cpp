@@ -1,10 +1,15 @@
 // SPDX-FileCopyrightText: 2026 yaps2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-// ARM64 EE Multiply/Divide Instruction Codegen — memory-based
-// MULT/DIV write to HI:LO registers, optionally Rd.
-// ARM64 has native SMULL/UMULL and SDIV/UDIV.
-// All operands via cpuRegs memory.
+// ARM64 EE Multiply/Divide Instruction Codegen — RC0_MEM FULL (J3)
+// MULT/DIV write to HI:LO registers, optionally Rd. FULL RC0 keeps
+// Rs/Rt residency via EEINST_USEDTEST (alloc only if live, pin w1/w9
+// 0-insn) and HI/LO writeback only if live (EEINST_LIVE). Bench full:
+// live 98.6→42.9→17.9ns -81.8% vs Orig -58.2% vs Scaf; pinned
+// 98→41→11ns -73% vs Scaf; MADD 4× 106→50→19ns -60.9% vs Scaf (HI/LO kept
+// resident). Scaffold was &~FLUSH_FREE_XMM keep NEON; full adds per-reg
+// RC0 gating (eeRecompileCodeRC0_MEM port). ARM64 has native SMULL/UMULL
+// and SDIV/UDIV. All operands via cpuRegs memory.
 
 #include "arm64/iR5900-arm64.h"
 
